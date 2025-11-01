@@ -1,0 +1,25 @@
+FROM python:3.11-slim AS build
+WORKDIR /pythonapp
+COPY requirements.txt .
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --upgrade pip \
+ && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+COPY . .
+FROM python:3.11-slim AS runtime
+ARG myownuser=mudasir
+ARG homedir=/home/${myownuser}
+ENV ENV=production
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:$PATH"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    passwd \
+ && rm -rf /var/lib/apt/lists/*
+RUN useradd -m -d ${homedir} -s /bin/bash ${myownuser}
+WORKDIR /app
+COPY --from=build /pythonapp /app
+COPY --from=build /opt/venv /opt/venv
+RUN chown -R ${myownuser}:${myownuser} /app
+USER ${myownuser}
+EXPOSE 5001
+CMD ["python3", "app.py"]
